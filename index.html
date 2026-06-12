@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Budgie — hold a key, say the thing</title>
+<meta name="description" content="A tiny, adorable, fully-offline dictation app for your Mac's menu bar. Hold a key, speak, release — your words appear wherever your cursor is. Free & open source.">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta property="og:title" content="Budgie — hold a key, say the thing">
+<meta property="og:description" content="A tiny, fully-offline dictation app for your Mac's menu bar. Free & open source.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://budgie.to">
+<meta property="og:image" content="https://budgie.to/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500..900;1,9..144,500..900&family=Nunito:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+<noscript><style>.reveal{opacity:1;transform:none}</style></noscript>
+<style>
+:root{
+  --cream:#FBF6E9;
+  --cream-2:#F4EBD3;
+  --yellow:#FADC7A;
+  --yellow-light:#FFF4CE;
+  --charcoal:#272320;
+  --ink-soft:#6B6157;
+  --red:#E0524D;
+  --radius:18px;
+  --shadow-pop:5px 6px 0 rgba(39,35,32,.92);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:"Nunito",sans-serif;
+  background:var(--cream);
+  color:var(--charcoal);
+  line-height:1.6;
+  overflow-x:hidden;
+}
+::selection{background:var(--yellow);color:var(--charcoal)}
+
+/* ---- grain ---- */
+body::after{
+  content:"";position:fixed;inset:0;z-index:50;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---- the menu bar nav ---- */
+.menubar{
+  position:sticky;top:0;z-index:40;
+  display:flex;align-items:center;gap:22px;
+  padding:7px 18px;
+  background:rgba(251,246,233,.86);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-bottom:1.5px solid rgba(39,35,32,.14);
+  font-size:13.5px;font-weight:700;
+}
+.menubar .bird-mini{width:17px;height:17px;flex:none}
+.menubar .appname{font-weight:900;letter-spacing:.01em}
+.menubar nav{display:flex;gap:20px}
+.menubar nav a{color:var(--charcoal);text-decoration:none;font-weight:600;opacity:.82;padding:2px 6px;border-radius:5px}
+.menubar nav a:hover{background:var(--yellow);opacity:1}
+.menubar .spacer{flex:1}
+.menubar .status{display:flex;align-items:center;gap:14px;font-weight:600;font-variant-numeric:tabular-nums}
+.menubar .status .stateicon{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center}
+@media(max-width:640px){ .menubar nav a:not(.nav-dl){display:none} .menubar{gap:12px} }
+
+/* ---- hero ---- */
+.hero{
+  max-width:1080px;margin:0 auto;padding:72px 24px 36px;
+  display:grid;grid-template-columns:1.25fr .75fr;gap:32px;align-items:center;
+  position:relative;
+}
+.hero::before{ /* soft yellow dawn behind everything */
+  content:"";position:absolute;top:-140px;right:-180px;width:680px;height:680px;z-index:-1;
+  background:radial-gradient(circle, rgba(250,220,122,.55), rgba(250,220,122,0) 62%);
+}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:13px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-soft);
+  margin-bottom:18px;
+}
+.eyebrow::before{content:"";width:26px;height:2px;background:var(--charcoal)}
+h1{
+  font-family:"Fraunces",serif;font-weight:900;
+  font-size:clamp(44px,7vw,78px);line-height:1.02;letter-spacing:-.015em;
+}
+h1 em{font-style:italic;color:#C8941A}
+.hero p.sub{
+  margin-top:22px;font-size:18.5px;max-width:30em;color:var(--ink-soft);font-weight:600;
+}
+.hero p.sub b{color:var(--charcoal)}
+.cta-row{display:flex;align-items:center;gap:18px;margin-top:32px;flex-wrap:wrap}
+.btn-dl{
+  display:inline-flex;align-items:center;gap:11px;
+  font-family:"Nunito",sans-serif;font-weight:900;font-size:17px;color:var(--charcoal);text-decoration:none;
+  background:linear-gradient(180deg,var(--yellow-light),var(--yellow));
+  border:2.5px solid var(--charcoal);border-radius:14px;
+  padding:14px 24px;box-shadow:var(--shadow-pop);
+  transition:transform .12s ease, box-shadow .12s ease;
+}
+.btn-dl:hover{transform:translate(2px,2px);box-shadow:3px 4px 0 rgba(39,35,32,.92)}
+.btn-dl:active{transform:translate(5px,6px);box-shadow:0 0 0 rgba(39,35,32,.92)}
+.btn-dl{white-space:nowrap}
+.btn-dl .meta{font-size:12px;font-weight:700;color:var(--ink-soft);white-space:nowrap}
+@media(max-width:480px){
+  h1 br{display:none}
+  .btn-dl{font-size:15px;padding:12px 18px;gap:8px}
+  .btn-dl .meta{display:none}
+}
+.btn-gh{
+  font-weight:800;font-size:15px;color:var(--charcoal);text-decoration:none;
+  border-bottom:2.5px solid var(--yellow);padding-bottom:1px;
+}
+.btn-gh:hover{border-bottom-color:var(--charcoal)}
+.trust{margin-top:26px;display:flex;gap:10px;flex-wrap:wrap}
+.chip{
+  font-size:12.5px;font-weight:800;color:var(--charcoal);
+  border:1.5px solid rgba(39,35,32,.3);border-radius:999px;padding:4px 12px;background:rgba(255,255,255,.45);
+}
+
+/* mascot */
+.mascot-wrap{display:flex;justify-content:center;position:relative}
+.mascot{
+  width:min(310px,68vw);aspect-ratio:1;
+  background:linear-gradient(180deg,var(--yellow-light),var(--yellow));
+  border:3px solid var(--charcoal);border-radius:26%;
+  box-shadow:8px 10px 0 rgba(39,35,32,.92);
+  display:flex;align-items:center;justify-content:center;
+  rotate:3deg;
+  animation:bob 5.5s ease-in-out infinite;
+}
+.mascot svg{width:62%;height:62%;color:var(--charcoal)}
+@keyframes bob{0%,100%{translate:0 0;rotate:3deg}50%{translate:0 -10px;rotate:1.5deg}}
+.eye{transform-box:fill-box;transform-origin:center;animation:blink 4.6s infinite}
+@keyframes blink{0%,94%,100%{transform:scaleY(1)}96%,98%{transform:scaleY(.08)}}
+
+/* ---- demo ---- */
+.demo{max-width:880px;margin:30px auto 0;padding:0 24px;position:relative}
+.window{
+  background:#FFFDF6;border:2.5px solid var(--charcoal);border-radius:16px;
+  box-shadow:var(--shadow-pop);overflow:hidden;
+}
+.titlebar{
+  display:flex;align-items:center;gap:8px;padding:11px 14px;
+  background:var(--cream-2);border-bottom:2px solid rgba(39,35,32,.5);
+}
+.dot{width:12px;height:12px;border-radius:50%;border:1.5px solid rgba(39,35,32,.35)}
+.dot.r{background:#F26D5F}.dot.y{background:#F8C64B}.dot.g{background:#62C25C}
+.titlebar .title{flex:1;text-align:center;font-size:12.5px;font-weight:800;color:var(--ink-soft)}
+.statuspill{
+  display:flex;align-items:center;gap:7px;
+  font-size:11px;font-weight:800;color:var(--ink-soft);
+  border:1.5px solid rgba(39,35,32,.3);border-radius:999px;padding:3px 10px;background:var(--cream);
+}
+.statuspill .stateicon{width:16px;height:16px;display:inline-flex}
+.canvas{padding:30px 32px;min-height:122px;font-size:19px;font-weight:600;line-height:1.55}
+.caret{display:inline-block;width:2.5px;height:1.18em;background:var(--charcoal);vertical-align:-3px;margin-left:1px;animation:caret 1s steps(1) infinite}
+@keyframes caret{50%{opacity:0}}
+.demo-foot{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:22px;flex-wrap:wrap}
+.keycap{
+  display:inline-flex;align-items:center;gap:8px;
+  font-weight:900;font-size:15px;
+  background:#FFFDF6;border:2.5px solid var(--charcoal);border-radius:12px;
+  padding:10px 18px;box-shadow:0 5px 0 rgba(39,35,32,.92);
+  transition:transform .1s, box-shadow .1s;
+}
+.keycap .sym{font-size:19px}
+.keycap.pressed{transform:translateY(5px);box-shadow:0 0 0 rgba(39,35,32,.92);background:var(--yellow-light)}
+.demo-foot .hint{font-size:13.5px;font-weight:700;color:var(--ink-soft)}
+
+/* state icons (bird / bars / dots) */
+.stateicon svg{width:100%;height:100%}
+.stateicon .bars rect{fill:var(--red)}
+.s-bird,.s-bars,.s-dots{display:none}
+.stateicon[data-state="idle"] .s-bird{display:block}
+.stateicon[data-state="rec"] .s-bars{display:block}
+.stateicon[data-state="think"] .s-dots{display:block}
+.s-bars rect{transform-box:fill-box;transform-origin:center;animation:lvl .55s ease-in-out infinite alternate}
+.s-bars rect:nth-child(2){animation-delay:.12s}.s-bars rect:nth-child(3){animation-delay:.24s}
+.s-bars rect:nth-child(4){animation-delay:.36s}.s-bars rect:nth-child(5){animation-delay:.08s}
+@keyframes lvl{from{transform:scaleY(.35)}to{transform:scaleY(1)}}
+.s-dots circle{animation:dotp .8s ease-in-out infinite}
+.s-dots circle:nth-child(2){animation-delay:.22s}.s-dots circle:nth-child(3){animation-delay:.44s}
+@keyframes dotp{0%,100%{opacity:.25}50%{opacity:1}}
+
+/* ---- sections ---- */
+section{max-width:1080px;margin:0 auto;padding:90px 24px 0}
+.kicker{font-size:13px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:10px}
+h2{font-family:"Fraunces",serif;font-weight:900;font-size:clamp(30px,4.4vw,46px);letter-spacing:-.01em;line-height:1.08}
+
+/* features bento */
+.bento{display:grid;grid-template-columns:repeat(6,1fr);gap:18px;margin-top:42px}
+.card{
+  background:#FFFDF6;border:2.5px solid var(--charcoal);border-radius:var(--radius);
+  padding:26px 26px 24px;box-shadow:var(--shadow-pop);
+  display:flex;flex-direction:column;gap:9px;
+  transition:transform .15s ease;
+}
+.card:hover{transform:translate(-2px,-3px)}
+.card h3{font-family:"Fraunces",serif;font-weight:800;font-size:21px;line-height:1.2}
+.card p{font-size:14.5px;font-weight:600;color:var(--ink-soft)}
+.card .ic{font-size:24px;line-height:1;margin-bottom:4px}
+.card.span3{grid-column:span 3}.card.span2{grid-column:span 2}.card.span4{grid-column:span 4}
+.card.yellow{background:linear-gradient(180deg,var(--yellow-light),var(--yellow))}
+.card.yellow h3{font-size:26px}
+.card.yellow p{color:var(--charcoal);opacity:.78}
+.card.dark{background:var(--charcoal);color:var(--cream);border-color:var(--charcoal)}
+.card.dark h3{color:var(--cream)}
+.card.dark p{color:rgba(251,246,233,.72)}
+.card.dark code{
+  display:block;margin-top:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:12.5px;background:rgba(251,246,233,.1);border-radius:9px;padding:10px 12px;
+  color:#FADC7A;overflow-x:auto;white-space:nowrap;
+}
+.card.dark a{color:var(--yellow);font-weight:800}
+@media(max-width:840px){ .bento{grid-template-columns:1fr 1fr} .card{grid-column:span 2 !important} }
+
+/* how it works */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:42px;position:relative}
+.steps::before{
+  content:"";position:absolute;top:44px;left:12%;right:12%;z-index:0;
+  border-top:3px dashed rgba(39,35,32,.32);
+}
+.step{position:relative;z-index:1;text-align:center;padding:0 12px}
+.step .bubble{
+  width:88px;height:88px;margin:0 auto 16px;border-radius:50%;
+  background:#FFFDF6;border:2.5px solid var(--charcoal);box-shadow:4px 5px 0 rgba(39,35,32,.92);
+  display:flex;align-items:center;justify-content:center;font-size:32px;
+}
+.step .bubble .sym{font-weight:900;font-size:34px}
+.step h3{font-family:"Fraunces",serif;font-size:20px;font-weight:800}
+.step p{font-size:14px;font-weight:600;color:var(--ink-soft);max-width:24em;margin:4px auto 0}
+.step .n{
+  position:absolute;top:-7px;left:calc(50% + 22px);
+  width:26px;height:26px;border-radius:50%;background:var(--yellow);border:2px solid var(--charcoal);
+  font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center;
+}
+@media(max-width:720px){ .steps{grid-template-columns:1fr} .steps::before{display:none} }
+
+/* open source band */
+.band{
+  margin-top:100px;background:var(--charcoal);color:var(--cream);
+  border-top:3px solid var(--charcoal);
+}
+.band-in{max-width:1080px;margin:0 auto;padding:84px 24px;display:grid;grid-template-columns:1.1fr .9fr;gap:44px;align-items:center}
+.band h2{color:var(--cream)}
+.band h2 em{font-style:italic;color:var(--yellow)}
+.band p{margin-top:16px;color:rgba(251,246,233,.75);font-weight:600;max-width:30em}
+.band .cta-row{margin-top:28px}
+.btn-dl.on-dark{box-shadow:5px 6px 0 rgba(250,220,122,.35)}
+.btn-dl.on-dark:hover{box-shadow:3px 4px 0 rgba(250,220,122,.35)}
+.btn-gh.on-dark{color:var(--cream)}
+.terminal{
+  background:#1B1815;border:2px solid rgba(251,246,233,.2);border-radius:14px;overflow:hidden;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;
+}
+.terminal .tbar{display:flex;gap:7px;padding:11px 13px;border-bottom:1.5px solid rgba(251,246,233,.12)}
+.terminal .tbar i{width:10px;height:10px;border-radius:50%;background:rgba(251,246,233,.22)}
+.terminal pre{padding:18px 18px 22px;line-height:1.85;overflow-x:auto;color:rgba(251,246,233,.85)}
+.terminal .c{color:rgba(251,246,233,.4)}
+.terminal .y{color:var(--yellow)}
+@media(max-width:840px){ .band-in{grid-template-columns:1fr} }
+
+/* footer */
+footer{padding:54px 24px 64px;text-align:center}
+footer .bird-mini{width:30px;height:30px;margin-bottom:12px;color:var(--charcoal)}
+footer .fline{font-size:14px;font-weight:700;color:var(--ink-soft)}
+footer .flinks{margin-top:12px;display:flex;gap:22px;justify-content:center;font-size:13.5px;font-weight:800}
+footer a{color:var(--charcoal);text-decoration:none;border-bottom:2px solid var(--yellow)}
+footer a:hover{border-bottom-color:var(--charcoal)}
+footer .domain{margin-top:22px;font-family:"Fraunces",serif;font-weight:900;font-size:15px;opacity:.5}
+
+/* reveals */
+.reveal{opacity:0;transform:translateY(16px);transition:opacity .6s ease,transform .6s ease}
+.reveal.in{opacity:1;transform:none}
+.hero .reveal{transition-delay:calc(var(--i,0)*90ms)}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important}
+  .reveal{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ======= bird symbol (geometry from MenuBarIcon.swift, y flipped for SVG) ======= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="bird">
+      <ellipse cx="9.7" cy="10.7" rx="4.4" ry="4.6"/>
+      <circle cx="6.8" cy="6.2" r="3.3"/>
+      <polygon points="4.3,5 1.5,7 4.3,7.4"/>
+      <polygon points="11,10 12.6,14 17.2,16.6"/>
+    </g>
+  </defs>
+</svg>
+
+<!-- ======= menu bar ======= -->
+<header class="menubar">
+  <svg class="bird-mini" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><use href="#bird"/></svg>
+  <span class="appname">Budgie</span>
+  <nav>
+    <a href="#features">Features</a>
+    <a href="#how">How it works</a>
+    <a href="https://github.com/mkh09353/budgie">GitHub</a>
+    <a class="nav-dl" href="#download">Download</a>
+  </nav>
+  <span class="spacer"></span>
+  <span class="status">
+    <span class="stateicon" id="navstate" data-state="idle" aria-hidden="true">
+      <svg class="s-bird" viewBox="0 0 18 18" fill="currentColor"><use href="#bird"/></svg>
+      <svg class="s-bars bars" viewBox="0 0 18 18"><rect x="1"  y="5" width="2.3" height="8" rx="1.15"/><rect x="4.4" y="3.5" width="2.3" height="11" rx="1.15"/><rect x="7.8" y="2" width="2.3" height="14" rx="1.15"/><rect x="11.2" y="3.5" width="2.3" height="11" rx="1.15"/><rect x="14.6" y="5" width="2.3" height="8" rx="1.15"/></svg>
+      <svg class="s-dots" viewBox="0 0 18 18" fill="currentColor"><circle cx="3.5" cy="9" r="1.9"/><circle cx="9" cy="9" r="1.9"/><circle cx="14.5" cy="9" r="1.9"/></svg>
+    </span>
+    <span id="clock">9:41 AM</span>
+  </span>
+</header>
+
+<!-- ======= hero ======= -->
+<main>
+<div class="hero">
+  <div>
+    <div class="eyebrow reveal" style="--i:0">Free, open-source dictation for macOS</div>
+    <h1 class="reveal" style="--i:1">Hold a key. <br>Say the <em>thing.</em></h1>
+    <p class="sub reveal" style="--i:2">Budgie is a tiny bird that lives in your menu bar.
+      Hold <b>right&nbsp;⌘</b>, talk, and your words appear wherever your cursor is —
+      <b>typed live, while you speak</b>. Release the key and you're done.</p>
+    <div class="cta-row reveal" style="--i:3">
+      <a class="btn-dl" id="dl" href="https://github.com/mkh09353/budgie/releases/latest">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><use href="#bird"/></svg>
+        Download for Mac
+        <span class="meta" id="dlmeta">v1.1 · 161 MB</span>
+      </a>
+      <a class="btn-gh" href="https://github.com/mkh09353/budgie">View the source ↗</a>
+    </div>
+    <div class="trust reveal" style="--i:4">
+      <span class="chip">100% offline</span>
+      <span class="chip">No account, no cloud</span>
+      <span class="chip">Apple silicon</span>
+      <span class="chip">macOS 14+</span>
+    </div>
+  </div>
+  <div class="mascot-wrap reveal" style="--i:2">
+    <div class="mascot" role="img" aria-label="Budgie app icon — a charcoal bird on a yellow rounded square">
+      <svg viewBox="0 0 18 18" fill="currentColor">
+        <use href="#bird"/>
+        <circle class="eye" cx="6.1" cy="5.45" r="0.52" fill="#FADC7A"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- ======= live demo ======= -->
+<div class="demo reveal">
+  <div class="window" aria-label="Animated demo of Budgie dictating text">
+    <div class="titlebar">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="title">notes — bird thoughts.txt</span>
+      <span class="statuspill">
+        <span class="stateicon" id="demostate" data-state="idle">
+          <svg class="s-bird" viewBox="0 0 18 18" fill="currentColor"><use href="#bird"/></svg>
+          <svg class="s-bars bars" viewBox="0 0 18 18"><rect x="1" y="5" width="2.3" height="8" rx="1.15"/><rect x="4.4" y="3.5" width="2.3" height="11" rx="1.15"/><rect x="7.8" y="2" width="2.3" height="14" rx="1.15"/><rect x="11.2" y="3.5" width="2.3" height="11" rx="1.15"/><rect x="14.6" y="5" width="2.3" height="8" rx="1.15"/></svg>
+          <svg class="s-dots" viewBox="0 0 18 18" fill="currentColor"><circle cx="3.5" cy="9" r="1.9"/><circle cx="9" cy="9" r="1.9"/><circle cx="14.5" cy="9" r="1.9"/></svg>
+        </span>
+        <span id="demolabel">budgie is ready</span>
+      </span>
+    </div>
+    <div class="canvas"><span id="typed"></span><span class="caret"></span></div>
+  </div>
+  <div class="demo-foot">
+    <span class="keycap" id="democap"><span class="sym">⌘</span> right command</span>
+    <span class="hint">← Live mode types <i>while</i> you talk. No waiting for a robot to think.</span>
+  </div>
+</div>
+
+<!-- ======= features ======= -->
+<section id="features">
+  <div class="kicker reveal">Why a budgie?</div>
+  <h2 class="reveal">Small bird. Strong opinions.</h2>
+  <div class="bento">
+    <div class="card yellow span4 reveal">
+      <div class="ic">🏠</div>
+      <h3>Nothing you say ever leaves your Mac.</h3>
+      <p>Budgie runs open speech models (NVIDIA Parakeet, via parakeet.cpp) entirely on your machine.
+         No cloud, no account, no audio uploads, no telemetry. Pull the Wi-Fi cable out — it keeps working.</p>
+    </div>
+    <div class="card span2 reveal">
+      <div class="ic">⚡</div>
+      <h3>Fast as a flap</h3>
+      <p>The engine stays warm in memory, so dictation starts the instant you press the key — and words stream out as you speak.</p>
+    </div>
+    <div class="card span2 reveal">
+      <div class="ic">⌨️</div>
+      <h3>Push-to-talk, not push-your-luck</h3>
+      <p>Hold right ⌘ to record, release to finish. A quick tap keeps the key's normal behaviour — Budgie only listens while you hold.</p>
+    </div>
+    <div class="card span2 reveal">
+      <div class="ic">🪶</div>
+      <h3>A bird, not a behemoth</h3>
+      <p>A native Swift menu-bar app. No Electron, no browser in a trench coat. It perches quietly until you need it.</p>
+    </div>
+    <div class="card dark span2 reveal">
+      <div class="ic">🛠️</div>
+      <h3>Open source, naturally</h3>
+      <p>Every line is on GitHub. Build it yourself, fork it, teach it new tricks.</p>
+      <code>git clone github.com/mkh09353/budgie</code>
+    </div>
+    <div class="card span3 reveal">
+      <div class="ic">✨</div>
+      <h3>Two dictation styles</h3>
+      <p><b>Live</b> types words as you say them. <b>Punctuated</b> waits a beat, then delivers polished text with punctuation.</p>
+    </div>
+    <div class="card span3 reveal">
+      <div class="ic">📋</div>
+      <h3>Your words, your way</h3>
+      <p>Type straight at the cursor in any app, or send the transcript to your clipboard instead. Your choice.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======= how it works ======= -->
+<section id="how">
+  <div class="kicker reveal">How it works</div>
+  <h2 class="reveal">Three seconds to learn. Honestly.</h2>
+  <div class="steps">
+    <div class="step reveal">
+      <div class="bubble"><span class="sym">⌘</span><span class="n">1</span></div>
+      <h3>Hold</h3>
+      <p>Press and hold right ⌘ (or pick another key). The bird turns into little red level bars.</p>
+    </div>
+    <div class="step reveal">
+      <div class="bubble">🗣️<span class="n">2</span></div>
+      <h3>Speak</h3>
+      <p>Say the email, the commit message, the grocery list. Words appear at your cursor as you talk.</p>
+    </div>
+    <div class="step reveal">
+      <div class="bubble">🎉<span class="n">3</span></div>
+      <h3>Release</h3>
+      <p>Let go. Done. Budgie even tracks how much typing time you've saved (it adds up fast).</p>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- ======= open source band ======= -->
+<div class="band" id="download">
+  <div class="band-in">
+    <div>
+      <h2>Free as in <em>bird.</em></h2>
+      <p>No subscription. No "pro tier". No analytics SDK quietly phoning home.
+         Budgie is a weekend-sized open-source app that does one thing beautifully —
+         and you can read every line of how it does it.</p>
+      <div class="cta-row">
+        <a class="btn-dl on-dark" id="dl2" href="https://github.com/mkh09353/budgie/releases/latest">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><use href="#bird"/></svg>
+          Download Budgie
+          <span class="meta" id="dlmeta2">v1.1 · 161 MB</span>
+        </a>
+        <a class="btn-gh on-dark" href="https://github.com/mkh09353/budgie">Star it on GitHub ↗</a>
+      </div>
+    </div>
+    <div class="terminal reveal" aria-label="Terminal showing Budgie install steps">
+      <div class="tbar"><i></i><i></i><i></i></div>
+      <pre><span class="c"># the whole install</span>
+$ open Budgie-1.1.dmg
+<span class="c"># drag the bird to Applications. that's it.</span>
+
+<span class="c"># or build it from source</span>
+$ git clone github.com/mkh09353/budgie
+$ ./build.sh
+<span class="y">Done -> Budgie.app  (Live-ready) 🐦</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ======= footer ======= -->
+<footer>
+  <svg class="bird-mini" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><use href="#bird"/></svg>
+  <div class="fline">Budgie — a tiny, fully-offline dictation app for macOS.<br>Made by Max Headley, with help from a very small bird.</div>
+  <div class="flinks">
+    <a href="https://github.com/mkh09353/budgie">GitHub</a>
+    <a href="https://github.com/mkh09353/budgie/releases">Releases</a>
+    <a href="https://github.com/mkh09353/budgie/issues">Report an issue</a>
+  </div>
+  <div class="domain">budgie.to</div>
+</footer>
+
+<script>
+/* live clock in the "menu bar" */
+function tick(){
+  const d=new Date();
+  document.getElementById('clock').textContent=
+    d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+}
+tick(); setInterval(tick,15000);
+
+/* latest release -> real download link + size */
+fetch('https://api.github.com/repos/mkh09353/budgie/releases/latest')
+  .then(r=>r.ok?r.json():null).then(rel=>{
+    if(!rel) return;
+    const dmg=(rel.assets||[]).find(a=>a.name.endsWith('.dmg'));
+    if(!dmg) return;
+    const meta=`${rel.tag_name} · ${(dmg.size/1048576).toFixed(0)} MB`;
+    for(const [b,m] of [['dl','dlmeta'],['dl2','dlmeta2']]){
+      document.getElementById(b).href=dmg.browser_download_url;
+      document.getElementById(m).textContent=meta;
+    }
+  }).catch(()=>{});
+
+/* scroll reveals */
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}
+}),{rootMargin:'0px 0px 180px 0px',threshold:.05});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+/* ---- the dictation demo ---- */
+const PHRASES=[
+  "remind me to grab sunflower seeds on the way home",
+  "shipping the new build tonight — it's a banger",
+  "dear diary, I wrote this whole thing without touching my keyboard",
+];
+const typed=document.getElementById('typed');
+const cap=document.getElementById('democap');
+const demoState=document.getElementById('demostate');
+const navState=document.getElementById('navstate');
+const label=document.getElementById('demolabel');
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const setState=(s,text)=>{demoState.dataset.state=s;navState.dataset.state=s;label.textContent=text;};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+async function runDemo(){
+  if(reduce){typed.textContent=PHRASES[0];setState('idle','budgie is ready');return;}
+  let i=0;
+  for(;;){
+    const words=PHRASES[i%PHRASES.length].split(' ');
+    await sleep(1300);
+    cap.classList.add('pressed');
+    setState('rec','listening…');
+    await sleep(450);
+    for(const w of words){                       // live mode: words land while you talk
+      typed.textContent+=(typed.textContent?' ':'')+w;
+      await sleep(170+Math.random()*240);
+    }
+    await sleep(380);
+    cap.classList.remove('pressed');
+    setState('think','finishing…');
+    await sleep(750);
+    setState('idle','typed at your cursor ✓');
+    await sleep(2600);
+    /* quick backspace erase */
+    while(typed.textContent.length){
+      typed.textContent=typed.textContent.slice(0,-3);
+      await sleep(11);
+    }
+    setState('idle','budgie is ready');
+    i++;
+  }
+}
+runDemo();
+</script>
+</body>
+</html>
